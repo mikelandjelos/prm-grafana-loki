@@ -1,0 +1,74 @@
+version: "3.8"
+
+services:
+  # --------------------------------------------------------------
+  # GRAFANA VISUALIZATION SERVICE
+  # --------------------------------------------------------------
+
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:latest
+    ports:
+      - 3000:3000
+    volumes:
+      - ./grafana/config/grafana.ini:/etc/grafana/grafana.ini:ro
+      - ./grafana/provisioning:/etc/grafana/provisioning/
+    networks:
+      - monitoring
+
+  # --------------------------------------------------------------
+  # MOCK LOGGER SERVICES
+  # --------------------------------------------------------------
+
+  random-logger:
+    container_name: random-logger
+    image: chentex/random-logger:latest
+    labels:
+      logging: "promtail"
+      logging_jobname: "containerlogs"
+    networks:
+      - monitoring
+
+  flog:
+    container_name: flog
+    image: mingrammer/flog:latest
+    labels:
+      logging: "promtail"
+      logging_jobname: "containerlogs"
+    command: -d 2s
+    networks:
+      - monitoring
+
+  # --------------------------------------------------------------
+  # LOGGING STACK SERVICES
+  # --------------------------------------------------------------
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    ports:
+      - 3100:3100
+    volumes:
+      - ./loki-config/loki-config.yml:/etc/loki/loki-config-default.yml:ro
+    command:
+      - "--config.file=/etc/loki/loki-config-default.yml"
+    networks:
+      - monitoring
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    volumes:
+      - ./promtail-config/promtail-config.yml:/etc/promtail/docker-config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/log:/var/log:ro
+    depends_on:
+      - loki
+    command:
+      - "--config.file=/etc/promtail/docker-config.yaml"
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    name: monitoring
